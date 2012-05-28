@@ -1,0 +1,18 @@
+#!/bin/bash
+
+################################################
+# Zimbra backup script for open source edition #
+################################################
+
+ZIMBRA_HOME=/opt/zimbra
+ZIMBRA_BIN=$ZIMBRA_HOME/bin
+ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup 
+mail_account="admin@zimbra.local"
+
+# backup
+$ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=zip" > $ZIMBRA_BACKUP_DIR/$mail_account.zip
+# return in tar.gz format 
+cd $ZIMBRA_BACKUP_DIR
+tar czf $mail_account.tar.gz $mail_account.zip
+rm $mail_account.zip
+cd $ZIMBRA_BIN
