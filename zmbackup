@@ -17,17 +17,25 @@ EOF
 
 }
 
-# create_backup ()
-# {
-#     mail_account=$2
-#     # backup
-#     $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date %G-%m-%d_%H-%M`.tgz
-#     # return in tar.gz format
-#     cd $ZIMBRA_BACKUP_DEFAULT_DIR
-#     tar czf $mail_account-$1.tar.gz $mail_account-$1.zip
-#     rm $mail_account-$1.zip
-#     cd $ZIMBRA_BIN
-# }
+create_backup()
+{
+    mail_account=$1
+    if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
+    else
+        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
+    fi
+}
+
+create_pack_backup()
+{   
+    if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
+    else
+        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
+    fi
+
+}
 
 # Option
 # zmbackup [-ah] [-u mailbox] [-o path] 
@@ -69,7 +77,7 @@ if [[ ! -z $UFLAG ]] && [[ $AFLAG -eq 1 ]]; then
     exit 1
 # if declare UFLAG
 elif [ ! -z $UFLAG ]; then
-    echo $UFLAG
+    create_backup $UFLAG
 fi
 
 # if AFLAG on
