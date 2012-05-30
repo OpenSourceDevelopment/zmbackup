@@ -6,17 +6,84 @@
 
 ZIMBRA_HOME=/opt/zimbra
 ZIMBRA_BIN=$ZIMBRA_HOME/bin
-ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup 
+ZIMBRA_BACKUP_DEFAULT_DIR=$ZIMBRA_HOME/backup 
 
-create_backup ()
+usage() 
 {
-	mail_account=$2
-	# backup
-	$ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=zip" > $ZIMBRA_BACKUP_DIR/$mail_account-$1.zip
-	# return in tar.gz format
-	cd $ZIMBRA_BACKUP_DIR
-	tar czf $mail_account-$1.tar.gz $mail_account-$1.zip
-	rm $mail_account-$1.zip
-	cd $ZIMBRA_BIN
+
+    cat << EOF
+zmbackup: zmbackup [-o path] -a|-u mailbox
+EOF
+
 }
 
+# create_backup ()
+# {
+#     mail_account=$2
+#     # backup
+#     $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date %G-%m-%d_%H-%M`.tgz
+#     # return in tar.gz format
+#     cd $ZIMBRA_BACKUP_DEFAULT_DIR
+#     tar czf $mail_account-$1.tar.gz $mail_account-$1.zip
+#     rm $mail_account-$1.zip
+#     cd $ZIMBRA_BIN
+# }
+
+# Option
+# zmbackup [-ah] [-u mailbox] [-o path] 
+while getopts aho:u: OPTION; do
+    case $OPTION in
+        a )
+            AFLAG=1
+            ;;
+        h )
+            usage
+            ;;
+        o )
+            if [[ -z $OPTARG ]]; then
+                echo "-o option must specific path"
+                exit 1
+            else
+                ZIMBRA_BACKUP_CURRENT_DIR=$OPTARG
+            fi
+            ;;
+        u ) 
+            if [[ -z $OPTARG ]]; then
+                echo "-u option must specific mailbox"
+            else
+                UFLAG=$OPTARG
+            fi
+            ;;
+    esac
+done
+
+# if not specific -a or -u it error and exit the script
+if [[ -z $UFLAG ]] && [[ $AFLAG -ne 1 ]]; then
+    echo "you must specific -a or -u option"
+    exit 1
+fi
+
+# if UFLAG has value but AFLAG is used
+if [[ ! -z $UFLAG ]] && [[ $AFLAG -eq 1 ]]; then
+    echo "use -a or -u"
+    exit 1
+# if declare UFLAG
+elif [ ! -z $UFLAG ]; then
+    echo $UFLAG
+fi
+
+# if AFLAG on
+if [[ $AFLAG -eq 1 ]]; then
+    echo "option a is set"
+    # check if -o option is set
+    if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+        echo "use path $ZIMBRA_BACKUP_CURRENT_DIR"
+    # use default path
+    else
+        echo "use default path"
+    fi
+fi
+
+if [[ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]]; then
+    echo $ZIMBRA_BACKUP_CURRENT_DIR
+fi
