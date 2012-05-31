@@ -29,15 +29,39 @@ create_backup()
 
 create_pack_backup()
 {   
-    accounts=`$ZIMBRA_BIN/zmprov -l gaa`
-    for account in $accounts; do
-        if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-            $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
-        else
-            $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
-        fi
-    done
+    domains=`$ZIMBRA_BIN/zmprov gad`
 
+    for domain in $domains; do
+    
+        # get all accounts
+        accounts=`$ZIMBRA_BIN/zmprov -l gaa $domain`
+
+        # check directory if -o is set
+        if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+            mkdir -p $ZIMBRA_BACKUP_CURRENT_DIR/$domain
+        else
+            mkdir -p $ZIMBRA_BACKUP_DEFAULT_DIR/$domain
+        fi
+
+        # fetch account in tgz format
+        for account in $accounts; do
+            if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+                $ZIMBRA_BIN/zmmailbox -z -m $account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$domain/$account-`date +%G-%m-%d_%H-%M`.tgz
+            else
+                $ZIMBRA_BIN/zmmailbox -z -m $account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$domain/$account-`date +%G-%m-%d_%H-%M`.tgz
+            fi
+        done
+
+        if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+            date_current=`date +%G-%m-%d_%H-%M`
+            cd $ZIMBRA_BACKUP_CURRENT_DIR/$domain
+            tar czf $domain-$date_current.tgz `ls`
+            mv $domain-$date_current.tgz $ZIMBRA_BACKUP_CURRENT_DIR
+            cd $ZIMBRA_BACKUP_CURRENT_DIR
+            rm -rf $ZIMBRA_BACKUP_CURRENT_DIR/$domain
+        fi 
+
+    done
 }
 
 # Option
@@ -86,13 +110,7 @@ fi
 # if AFLAG on
 if [[ $AFLAG -eq 1 ]]; then
     echo "option a is set"
-    # check if -o option is set
-    if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-        echo "use path $ZIMBRA_BACKUP_CURRENT_DIR"
-    # use default path
-    else
-        echo "use default path"
-    fi
+    create_pack_backup
 fi
 
 if [[ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]]; then
