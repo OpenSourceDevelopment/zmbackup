@@ -29,11 +29,14 @@ create_backup()
 
 create_pack_backup()
 {   
-    if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
-    else
-        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
-    fi
+    accounts=`$ZIMBRA_BIN/zmprov -l gaa`
+    for account in $accounts; do
+        if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
+            $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
+        else
+            $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
+        fi
+    done
 
 }
 
