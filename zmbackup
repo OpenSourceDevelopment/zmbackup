@@ -6,7 +6,9 @@
 
 ZIMBRA_HOME=/opt/zimbra
 ZIMBRA_BIN=$ZIMBRA_HOME/bin
-ZIMBRA_BACKUP_DEFAULT_DIR=$ZIMBRA_HOME/backup 
+ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup 
+
+BACKUP_DATE=`date +%G-%m-%d_%H-%M` 
 
 usage() 
 {
@@ -19,13 +21,9 @@ EOF
 
 create_backup()
 {
-    mail_account=$1
-    if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
-    else
-        $ZIMBRA_BIN/zmmailbox -z -m $mail_account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$mail_account-`date +%G-%m-%d_%H-%M`.tgz
-    fi
-}
+    mbox=$1
+    $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$mbox-$BACKUP_DATE.tgz 
+} 
 
 create_pack_backup()
 {   
@@ -37,29 +35,18 @@ create_pack_backup()
         accounts=`$ZIMBRA_BIN/zmprov -l gaa $domain`
 
         # check directory if -o is set
-        if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-            mkdir -p $ZIMBRA_BACKUP_CURRENT_DIR/$domain
-        else
-            mkdir -p $ZIMBRA_BACKUP_DEFAULT_DIR/$domain
-        fi
+        mkdir -p $ZIMBRA_BACKUP_DIR/$domain
 
         # fetch account in tgz format
         for account in $accounts; do
-            if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-                $ZIMBRA_BIN/zmmailbox -z -m $account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_CURRENT_DIR/$domain/$account-`date +%G-%m-%d_%H-%M`.tgz
-            else
-                $ZIMBRA_BIN/zmmailbox -z -m $account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DEFAULT_DIR/$domain/$account-`date +%G-%m-%d_%H-%M`.tgz
-            fi
+            $ZIMBRA_BIN/zmmailbox -z -m $account getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$domain/$account-$BACKUP_DATE.tgz
         done
 
-        if [ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]; then
-            date_current=`date +%G-%m-%d_%H-%M`
-            cd $ZIMBRA_BACKUP_CURRENT_DIR/$domain
-            tar czf $domain-$date_current.tgz `ls`
-            mv $domain-$date_current.tgz $ZIMBRA_BACKUP_CURRENT_DIR
-            cd $ZIMBRA_BACKUP_CURRENT_DIR
-            rm -rf $ZIMBRA_BACKUP_CURRENT_DIR/$domain
-        fi 
+        cd $ZIMBRA_BACKUP_DIR/$domain
+        tar czf $domain-$BACKUP_DATE.tgz `ls`
+        mv $domain-$BACKUP_DATE.tgz $ZIMBRA_BACKUP_DIR
+        cd $ZIMBRA_BACKUP_DIR
+        rm -rf $ZIMBRA_BACKUP_DIR/$domain
 
     done
 }
@@ -79,7 +66,7 @@ while getopts aho:u: OPTION; do
                 echo "-o option must specific path"
                 exit 1
             else
-                ZIMBRA_BACKUP_CURRENT_DIR=$OPTARG
+                ZIMBRA_BACKUP_DIR=$OPTARG
             fi
             ;;
         u ) 
@@ -113,6 +100,3 @@ if [[ $AFLAG -eq 1 ]]; then
     create_pack_backup
 fi
 
-if [[ ! -z $ZIMBRA_BACKUP_CURRENT_DIR ]]; then
-    echo $ZIMBRA_BACKUP_CURRENT_DIR
-fi
