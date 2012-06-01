@@ -10,6 +10,17 @@ ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup
 
 BACKUP_DATE=`date +%G-%m-%d_%H-%M` 
 
+# set default option is 0 (unset)
+VERBOSE=0 
+
+log()
+{
+    # verbose option is turn on
+    if [ $VERBOSE -eq 1 ]; then
+        echo $1
+    fi
+}
+
 usage() 
 {
 
@@ -19,19 +30,32 @@ EOF
 
 }
 
-create_backup()
+backup_mailbox()
 {
     mbox=$1
-    $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$mbox-$BACKUP_DATE.tgz 
+    log "start backup mailbox $mbox"
+
+    if [ ! -z $2 ]; then
+        $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$2/$mbox-$BACKUP_DATE.tgz
+        log "backup mailbox $mbox successful"
+        log "backup to $ZIMBRA_BACKUP_DIR/$2"
+
+    else
+        $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$mbox-$BACKUP_DATE.tgz 
+        log "backup mailbox $mbox successful"
+        log "backup to $ZIMBRA_BACKUP_DIR"
+    fi
 } 
 
 create_pack_backup()
 {   
+    log "search domain"
     domains=`$ZIMBRA_BIN/zmprov gad`
 
     for domain in $domains; do
-    
-        # get all accounts
+        log "start backup domain $domain" 
+
+        # get all accounts from domain
         mboxs=`$ZIMBRA_BIN/zmprov -l gaa $domain`
 
         # check directory if -o is set
@@ -39,7 +63,8 @@ create_pack_backup()
 
         # fetch account in tgz format
         for mbox in $mboxs; do
-            $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$domain/$mbox-$BACKUP_DATE.tgz
+#            $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$domain/$mbox-$BACKUP_DATE.tgz
+            backup_mailbox $mbox $domain
         done
 
         # pack mailbox in domain
@@ -48,13 +73,15 @@ create_pack_backup()
         mv $domain-$BACKUP_DATE.tgz $ZIMBRA_BACKUP_DIR
         cd $ZIMBRA_BACKUP_DIR
         rm -rf $ZIMBRA_BACKUP_DIR/$domain
+        
+        log "backup domain $domain successful"
 
     done
 }
 
 # Option
 # zmbackup [-ah] [-u mailbox] [-o path] 
-while getopts :aho:u: OPTION; do
+while getopts :aho:u:v OPTION; do
     case $OPTION in
         a )
             AFLAG=1
@@ -77,6 +104,14 @@ while getopts :aho:u: OPTION; do
                 UFLAG=$OPTARG
             fi
             ;;
+        v )
+            VERBOSE=1
+            ;;
+        # other option doesn't match
+        * )
+            usage
+            exit 1
+            ;;
     esac
 done
 
@@ -92,7 +127,7 @@ if [ ! -z $UFLAG ] && [[ $AFLAG -eq 1 ]]; then
     exit 1
 # if declare UFLAG
 elif [ ! -z $UFLAG ]; then
-    create_backup $UFLAG
+    backup_mailbox $UFLAG
 fi
 
 # if AFLAG on
