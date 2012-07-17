@@ -25,7 +25,7 @@ usage()
 {
 
     cat << EOF
-zmbackup: zmbackup [-o path] -a|-u mailbox
+zmbackup: zmbackup [-o path] -a|[-u mailbox]
 EOF
 
 }
