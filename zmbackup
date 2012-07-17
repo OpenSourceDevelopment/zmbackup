@@ -6,12 +6,12 @@
 
 ZIMBRA_HOME=/opt/zimbra
 ZIMBRA_BIN=$ZIMBRA_HOME/bin
-ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup 
+ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup
 
-BACKUP_DATE=`date +%G-%m-%d_%H-%M` 
+BACKUP_DATE=`date +%G-%m-%d_%H-%M`
 
 # set default option is 0 (unset)
-VERBOSE=0 
+VERBOSE=0
 
 log()
 {
@@ -21,7 +21,7 @@ log()
   fi
 }
 
-usage() 
+usage()
 {
 
   cat << EOF
@@ -35,27 +35,33 @@ backup_mailbox()
   # params
   mbox=$1
   domain=$2
+
   log "start backup mailbox $mbox"
 
   if [ ! -z $domain ]; then
-    $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$2/$mbox-$BACKUP_DATE.tgz
-    log "backup mailbox $mbox successful"
-    log "backup to $ZIMBRA_BACKUP_DIR/$2"
-
+    if [ ! -z $data_types ]; then
+      $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz&types=$data_types" > $ZIMBRA_BACKUP_DIR/$2/$mbox-$BACKUP_DATE.tgz
+    else
+      $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$2/$mbox-$BACKUP_DATE.tgz
+    fi
   else
-    $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$mbox-$BACKUP_DATE.tgz 
-    log "backup mailbox $mbox successful"
-    log "backup to $ZIMBRA_BACKUP_DIR"
+    if [ ! -z $data_types ]; then
+      $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz&types=$data_types" > $ZIMBRA_BACKUP_DIR/$mbox-$BACKUP_DATE.tgz
+    else
+      $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$mbox-$BACKUP_DATE.tgz
+    fi
   fi
-} 
+  log "backup mailbox $mbox successful"
+  log "backup to $ZIMBRA_BACKUP_DIR/$domain"
+}
 
 create_pack_backup()
-{   
+{
   log "lookup domain"
   domains=`$ZIMBRA_BIN/zmprov gad`
 
   for domain in $domains; do
-    log "start backup domain $domain" 
+    log "start backup domain $domain"
 
     # get all accounts from domain
     mboxs=`$ZIMBRA_BIN/zmprov -l gaa $domain`
@@ -64,7 +70,6 @@ create_pack_backup()
 
     # fetch account in tgz format
     for mbox in $mboxs; do
-      #            $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz" > $ZIMBRA_BACKUP_DIR/$domain/$mbox-$BACKUP_DATE.tgz
       backup_mailbox $mbox $domain
     done
 
@@ -81,11 +86,20 @@ create_pack_backup()
 }
 
 # Option
-# zmbackup [-ah] [-u mailbox] [-o path] 
-while getopts :aho:u:v OPTION; do
+# zmbackup [-ah] [-u mailbox] [-o path]
+while getopts :ad:ho:u:v OPTION; do
   case $OPTION in
     a )
       AFLAG=1
+      ;;
+    d )
+      if [ -z $OPTARG ]; then
+        usage
+        exit 1
+      else
+        # data_types=${OPTARG//","/"%2C"} # replace comma (,) with %2C follow encoding url
+        data_types=$OPTARG
+      fi
       ;;
     o )
       if [ -z $OPTARG ]; then
