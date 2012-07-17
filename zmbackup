@@ -86,9 +86,6 @@ while getopts :aho:u:v OPTION; do
         a )
             AFLAG=1
             ;;
-        h )
-            usage
-            ;;
         o )
             if [ -z $OPTARG ]; then
                 echo "-o option must specific path"
@@ -108,7 +105,7 @@ while getopts :aho:u:v OPTION; do
             VERBOSE=1
             ;;
         # other option doesn't match
-        * )
+        h | * )
             usage
             exit 1
             ;;
