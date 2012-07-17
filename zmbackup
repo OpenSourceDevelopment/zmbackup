@@ -25,7 +25,22 @@ usage()
 {
 
   cat << EOF
-  zmbackup: zmbackup [-o path] -a|[-u mailbox]
+zmbackup: zmbackup [-o path] -a|[-u mailbox] [-d data_types]
+-a
+  backup all accounts and all domains in system.
+-u mailbox
+  backup specific mailbox(account).
+-o path
+  place output to path
+-d data_types
+  backup with specific data types by define option
+    message         backup mail
+    conversation    backup mail reply
+    contact         backup contact
+    appointment     backup calendar
+    task            backup task
+    document        backup document or briefcase
+  Ex. zmbackup -a -d message,conversation # it's backup mail reply only
 EOF
 
 }
