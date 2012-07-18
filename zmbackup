@@ -10,13 +10,13 @@ ZIMBRA_BACKUP_DIR=$ZIMBRA_HOME/backup
 
 BACKUP_DATE=`date +%G-%m-%d_%H-%M`
 
-# set default option is 0 (unset)
-VERBOSE=0
+# set default option is false (unset)
+VERBOSE=false
 
 log()
 {
   # verbose option is turn on
-  if [ $VERBOSE -eq 1 ]; then
+  if $VERBOSE; then
     echo $1
   fi
 }
@@ -134,10 +134,10 @@ while getopts :ad:ho:u:v OPTION; do
       fi
       ;;
     v )
-      VERBOSE=1
+      VERBOSE=true
       ;;
       # other option doesn't match
-      h | * )
+    h | * )
       usage
       exit 1
       ;;
