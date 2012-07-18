@@ -120,8 +120,10 @@ while getopts :ad:ho:u:v OPTION; do
       if [ -z $OPTARG ]; then
         echo "-o option must specific path"
         exit 1
-      else
+      elif [ ${OPTARG:${#OPTARG}-1:${#OPTARG}} == "/" ]; then # if last character has "/" then cut "/"
         ZIMBRA_BACKUP_DIR=${OPTARG:0:${#OPTARG}-1} # substring from 0 to strlen - 1
+      else
+        ZIMBRA_BACKUP_DIR=$OPTARG
       fi
       ;;
     u )
