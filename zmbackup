@@ -143,24 +143,19 @@ while getopts :ad:ho:u:v OPTION; do
       ;;
   esac
 done
-
+echo "$UFLAG $AFLAG"
 # if not specific -a or -u it error and exit the script
 if [ -z $UFLAG ] && [ ! $AFLAG ]; then
   echo "you must specific -a or -u option"
   exit 1
-fi
-
-# if UFLAG has value but AFLAG is used
-if [ ! -z $UFLAG ] && $AFLAG ; then
+elif [ -n "$UFLAG" ] && [ $AFLAG ]; then # if -u and -a has enable
   echo "use -a or -u"
   exit 1
-  # if declare UFLAG
-elif [ ! -z $UFLAG ]; then
+elif [ -n "$UFLAG" ]; then # if call -u
   backup_mailbox $UFLAG
-fi
-
-# if AFLAG enable
-if $AFLAG ; then
+  exit 1
+elif [ $AFLAG ]; then # if call -a
   create_pack_backup
+  exit 1
 fi
 
