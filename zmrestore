@@ -19,8 +19,12 @@ zmsetvars \
 
 log()
 {
+    local lev=1
+    if [[ ! -z $2 ]] ; then
+      lev=$2
+    fi
     # verbose option is turn on
-    if [ $VERBOSE -eq 1 ]; then
+    if [ $VERBOSE -ge $lev ]; then
         echo $1
     fi
 }
@@ -29,75 +33,148 @@ usage()
 {
 
     cat << EOF
-zmrestore: zmrestore [-o path] -a|-u mailbox [-f file]
+zmrestore: zmrestore [-v 0..9] [-o path] -a|-u mailbox [-f file] [-d domain] [-t backupdatetime]
 EOF
 
 }
 
 restore_mailbox()
 {
-    mbox=$1
+    local OPTIND=1
+    local OPTARG=''
+    local USER=''
+    local domain=''
+    local FILE=''
+    while getopts :f:d:u:t: OPTION $* ; do
+        case $OPTION in
+        d )
+          domain=$OPTARG
+          ;;
+        f )
+          FILE=$OPTARG
+          ;;
+        t )
+          RESTORE_DATE=$OPTARG
+          ;;
+        u )
+          USER=$OPTARG
+          ;;
+        * )
+          log "ERROR: Unknown option $OPTION"
+          exit 1
+          ;;
+       esac
+    done
+
+    if [ -z "$USER" ] ; then
+      log "ERROR: MUST specify a user account for restore_mailbox()"
+      exit 1
+    fi
+
+    local mbox=$USER
+
+    log "DEBUG: mbox:$mbox FILE:$FILE RESTORE_DATE:$RESTORE_DATE domain:$domain" 3
     log "start restore mailbox $mbox"
-    zimbraMailSSLPort=`zmprov gs $zimbra_server_hostname zimbraMailSSLPort | egrep -v -e '^(#|$)' | cut -d ' ' -f 2`
+    local zimbraMailSSLPort=`zmprov gs $zimbra_server_hostname zimbraMailSSLPort | egrep -v -e '^(#|$)' | cut -d ' ' -f 2`
     if [ -z "$zimbraMailSSLPort" ] ; then
       log "ERROR: Cannot find zimbraMailSSLPort"
       exit 1
     fi
-    if [ ! -z "$2" -a -z "$3" ] ; then
-        if [ -f $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz ] ; then
-          log "$ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} '//?fmt=tgz&resolve=reset' $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz"
-          $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} '//?fmt=tgz&resolve=reset' $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz
-          log "restore mailbox $mbox from $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz successful"
+    if [ -z "$FILE" ] ; then
+      if [ ! -z "$domain" ] ; then
+        if [ -f $ZIMBRA_RESTORE_DIR/$domain/$mbox-$RESTORE_DATE.tgz ] ; then
+          $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} '//?fmt=tgz&resolve=reset' $ZIMBRA_RESTORE_DIR/$domain/$mbox-$RESTORE_DATE.tgz
+          log "restore mailbox $mbox from $ZIMBRA_RESTORE_DIR/$domain/$mbox-$RESTORE_DATE.tgz successful"
         else
-          log "ERROR: Cannot restore mailbox $mbox from $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz - File Not Found"
+          log "ERROR: Cannot restore mailbox $mbox from $ZIMBRA_RESTORE_DIR/$domain/$mbox-$RESTORE_DATE.tgz - File Not Found"
           exit 5
         fi
-    else
-      if [ ! -z "$3" ]; then
-        $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} "//?fmt=tgz&resolve=reset" $3 
-        log "restore mailbox $mbox from $3 successful"
       else
-        $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} "//?fmt=tgz&resolve=reset" $ZIMBRA_RESTORE_DIR/$mbox-$RESTORE_DATE.tgz 
-        log "restore mailbox $mbox from $ZIMBRA_RESTORE_DIR successful"
+        log "ERROR: No domain provided. Must specify domain or file for restore_mailbox()"
+        exit 1
       fi
+    else
+        $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} "//?fmt=tgz&resolve=reset" $FILE
+        log "restore mailbox $mbox from $FILE successful"
     fi
-} 
+}
 
-create_pack_restore()
-{   
+unpack_restore()
+{
     log "search domain"
-    domains=`$ZIMBRA_BIN/zmprov gad`
+    local OPTIND=1
+    local OPTARG=''
+    local USER=''
+    local domain=''
+    local FILE=''
+    local DATE=''
+    local domains=`$ZIMBRA_BIN/zmprov gad`
+
+    while getopts :f:d:u:t: OPTION $* ; do
+        case $OPTION in
+        d )
+          domains=$OPTARG
+          ;;
+        f )
+          FILE=$OPTARG
+          ;;
+        t )
+          RESTORE_DATE=$OPTARG
+          DATE="-t $RESTORE_DATE"
+          ;;
+        u )
+          USER=$OPTARG
+          ;;
+        * )
+          log "ERROR: Unknown option $OPTION"
+          exit 1
+          ;;
+       esac
+    done
+    if [ -z "$FILE" ] ; then
+      FILE=$ZIMBRA_RESTORE_DIR/$domain-$RESTORE_DATE.tgz
+    fi
+    if [ ! -f "$FILE" ] ; then
+      log "ERROR: $FILE does not exist!"
+      exit 5
+    fi
 
     for domain in $domains; do
         log "start restore domain $domain" 
 
-        # get all accounts from domain
-        mboxs=`$ZIMBRA_BIN/zmprov -l gaa $domain`
+        local mboxs=$USER
+        if [ -z "$USER" ] ; then
+          # get all accounts from domain
+          mboxs=`$ZIMBRA_BIN/zmprov -l gaa $domain`
+        fi
 
+        cd $ZIMBRA_RESTORE_DIR
         # check directory if -o is set
         mkdir -p $ZIMBRA_RESTORE_DIR/$domain
+        cd $ZIMBRA_RESTORE_DIR/$domain
+        if [ ! -f "$FILE" ] ; then
+          log "ERROR: $FILE does not exist!"
+          exit 5
+        fi
+        tar zxf $FILE
 
         # fetch account in tgz format
         for mbox in $mboxs; do
-#            $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz&resolve=reset" > $ZIMBRA_RESTORE_DIR/$domain/$mbox-$RESTORE_DATE.tgz
-            restore_mailbox $mbox $domain
+#           #$ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz&resolve=reset" > $ZIMBRA_RESTORE_DIR/$domain/$mbox-$RESTORE_DATE.tgz
+            restore_mailbox -u $mbox -d $domain $DATE
         done
 
-        # pack mailbox in domain
-        cd $ZIMBRA_RESTORE_DIR/$domain
-        tar czf $domain-$RESTORE_DATE.tgz `ls`
-        mv $domain-$RESTORE_DATE.tgz $ZIMBRA_RESTORE_DIR
         cd $ZIMBRA_RESTORE_DIR
         rm -rf $ZIMBRA_RESTORE_DIR/$domain
-        
+
         log "restore domain $domain successful"
 
     done
 }
 
 # Option
-# zmrestore [-ah] [-u mailbox] [-o path] [-f backupfile]
-while getopts :aho:u:f:v OPTION; do
+# zmrestore [-ah] [-u mailbox] [-o path] [-f backupfile] [-d domain] [-t backupdate]
+while getopts :aho:u:f:v:d:t: OPTION; do
     case $OPTION in
         a )
             AFLAG=1
@@ -124,11 +201,30 @@ while getopts :aho:u:f:v OPTION; do
             if [ -z $OPTARG ]; then
                 echo "-f option must specify an existing backup file"
             else
-                UFILE=$OPTARG
+                UFILE="-f $OPTARG"
+            fi
+            ;;
+        d ) 
+            if [ -z $OPTARG ]; then
+              echo "-d option must specify the domain"
+            else
+                DOMAIN=$OPTARG
+            fi
+            ;;
+        t ) 
+            if [ -z $OPTARG ]; then
+              echo "-t option must specify the date (of an existing backup)"
+            else
+                RESTORE_DATE=$OPTARG
+                DATE="-t $OPTARG"
             fi
             ;;
         v )
-            VERBOSE=1
+            if [[ -z "`echo $OPTARG | egrep -e '^[0-9]*\$' 2>/dev/null`" ]] ; then
+              usage
+              exit 1
+            fi
+            VERBOSE=$OPTARG
             ;;
         # other option doesn't match
         * )
@@ -140,20 +236,54 @@ done
 
 # if not specific -a or -u it error and exit the script
 if [ -z $UFLAG ] && [[ $AFLAG -ne 1 ]]; then
-    echo "you must specific -a or -u option"
+    echo "you must specify -a or -u option"
     exit 1
-fi
-
 # if UFLAG has value but AFLAG is used
-if [ ! -z $UFLAG ] && [[ $AFLAG -eq 1 ]]; then
+elif [ ! -z $UFLAG ] && [[ $AFLAG -eq 1 ]]; then
     echo "use -a or -u"
     exit 1
 # if declare UFLAG
 elif [ ! -z $UFLAG ]; then
-    restore_mailbox $UFLAG from-file $UFILE
+    if [ -z "$UFILE" ] ; then
+      if [ -z "$DOMAIN" ] ; then
+        UFILE=$ZIMBRA_RESTORE_DIR/$UFLAG-$RESTORE_DATE.tgz
+        if [ ! -f "$UFILE" ] ; then
+          log "ERROR: Cannot determine backup file for -u $UFILE -d $DOMAIN -t $RESTORE_DATE"
+          exit 1
+        fi
+        restore_mailbox -u $UFLAG -f $UFILE $DATE
+      else
+        UFILE=$ZIMBRA_RESTORE_DIR/$DOMAIN-$RESTORE_DATE.tgz
+        if [ ! -f "$UFILE" ] ; then
+          log "ERROR: Cannot determine backup file for -u $UFLAG -d $DOMAIN -t $RESTORE_DATE"
+          exit 1
+        fi
+        unpack_restore -u $UFLAG -d $DOMAIN -f $UFILE $DATE
+      fi
+    else
+        if [ ! -f "$UFILE" ] ; then
+          log "ERROR: Cannot find backup file for -u $UFILE -f $UFILE -t $RESTORE_DATE"
+          exit 5
+        fi
+        restore_mailbox -u $UFLAG -f $UFILE $DATE
+    fi
+# if AFLAG on
+elif [[ $AFLAG -eq 1 ]]; then
+    if [ -z "$UFILE" ] ; then
+      if [ -z "$DOMAIN" ] ; then
+        unpack_restore $DATE
+      else
+        unpack_restore $DATE -d $DOMAIN
+      fi
+    else
+      if [ -z "$DOMAIN" ] ; then
+        unpack_restore $DATE -f $UFILE
+      else
+        unpack_restore $DATE -d $DOMAIN -f $UFILE
+      fi
+    fi
+else
+    echo "you must specify -a or -u option"
+    exit 1
 fi
 
-# if AFLAG on
-if [[ $AFLAG -eq 1 ]]; then
-    create_pack_retore
-fi
