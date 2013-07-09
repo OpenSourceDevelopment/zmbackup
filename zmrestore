@@ -13,6 +13,10 @@ RESTORE_DATE=`date +%G-%m-%d_%H-%M`
 # set default option is 0 (unset)
 VERBOSE=0 
 
+source $ZIMBRA_BIN/zmshutil || exit 1
+zmsetvars \
+	zimbra_server_hostname 
+
 log()
 {
     # verbose option is turn on
@@ -25,7 +29,7 @@ usage()
 {
 
     cat << EOF
-zmrestore: zmrestore [-o path] -a|-u mailbox
+zmrestore: zmrestore [-o path] -a|-u mailbox [-f file]
 EOF
 
 }
@@ -34,16 +38,28 @@ restore_mailbox()
 {
     mbox=$1
     log "start restore mailbox $mbox"
-
-    if [ ! -z $2 ]; then
-        $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz&resolve=reset" > $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz
-        log "restore mailbox $mbox successful"
-        log "restore to $ZIMBRA_RESTORE_DIR/$2"
-
+    zimbraMailSSLPort=`zmprov gs $zimbra_server_hostname zimbraMailSSLPort | egrep -v -e '^(#|$)' | cut -d ' ' -f 2`
+    if [ -z "$zimbraMailSSLPort" ] ; then
+      log "ERROR: Cannot find zimbraMailSSLPort"
+      exit 1
+    fi
+    if [ ! -z "$2" -a -z "$3" ] ; then
+        if [ -f $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz ] ; then
+          log "$ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} '//?fmt=tgz&resolve=reset' $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz"
+          $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} '//?fmt=tgz&resolve=reset' $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz
+          log "restore mailbox $mbox from $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz successful"
+        else
+          log "ERROR: Cannot restore mailbox $mbox from $ZIMBRA_RESTORE_DIR/$2/$mbox-$RESTORE_DATE.tgz - File Not Found"
+          exit 5
+        fi
     else
-        $ZIMBRA_BIN/zmmailbox -z -m $mbox getRestURL "//?fmt=tgz&resolve=reset" > $ZIMBRA_RESTORE_DIR/$mbox-$RESTORE_DATE.tgz 
-        log "restore mailbox $mbox successful"
-        log "restore to $ZIMBRA_RESTORE_DIR"
+      if [ ! -z "$3" ]; then
+        $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} "//?fmt=tgz&resolve=reset" $3 
+        log "restore mailbox $mbox from $3 successful"
+      else
+        $ZIMBRA_BIN/zmmailbox -v -z -m $mbox postRestURL -u https://${zimbra_server_hostname}:${zimbraMailSSLPort} "//?fmt=tgz&resolve=reset" $ZIMBRA_RESTORE_DIR/$mbox-$RESTORE_DATE.tgz 
+        log "restore mailbox $mbox from $ZIMBRA_RESTORE_DIR successful"
+      fi
     fi
 } 
 
@@ -80,8 +96,8 @@ create_pack_restore()
 }
 
 # Option
-# zmrestore [-ah] [-u mailbox] [-o path] 
-while getopts :aho:u:v OPTION; do
+# zmrestore [-ah] [-u mailbox] [-o path] [-f backupfile]
+while getopts :aho:u:f:v OPTION; do
     case $OPTION in
         a )
             AFLAG=1
@@ -102,6 +118,13 @@ while getopts :aho:u:v OPTION; do
                 echo "-u option must specific mailbox"
             else
                 UFLAG=$OPTARG
+            fi
+            ;;
+        f ) 
+            if [ -z $OPTARG ]; then
+                echo "-f option must specify an existing backup file"
+            else
+                UFILE=$OPTARG
             fi
             ;;
         v )
@@ -127,7 +150,7 @@ if [ ! -z $UFLAG ] && [[ $AFLAG -eq 1 ]]; then
     exit 1
 # if declare UFLAG
 elif [ ! -z $UFLAG ]; then
-    restore_mailbox $UFLAG
+    restore_mailbox $UFLAG from-file $UFILE
 fi
 
 # if AFLAG on
